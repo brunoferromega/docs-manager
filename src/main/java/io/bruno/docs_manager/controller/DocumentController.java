@@ -5,8 +5,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("api/upload/docs")
-public class AssetsController {
+@RequestMapping("api/docs")
+public class DocumentController {
 
     @GetMapping
     public String getStatus() {
