@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: docs-manager
+  jpa:
+    hibernate:
+      ddl-auto: create-drop #none          # Liquibase owns the schema
+    show-sql: true
+
+logging:
+  level:
+    liquibase: INFO

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: bruno
+      POSTGRES_PASSWORD: bruno
+      POSTGRES_DB: docs_storage
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    labels:
+      org.springframework.boot.service-connection: postgres
+
+volumes:
+  pgdata:
