@@ -5,12 +5,14 @@ import io.bruno.docs_manager.entity.DocumentStatus;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Set;
 import java.util.UUID;
 
 public record DocumentResponse(
         UUID id,
         String title,
         String description,
+        Set<String> tags,
         UUID ownerId,
         DocumentStatus status,
         OffsetDateTime createdAt,
@@ -21,6 +23,7 @@ public record DocumentResponse(
                 document.getId(),
                 document.getTitle(),
                 document.getDescription(),
+                document.getTags(),
                 document.getOwnerId(),
                 document.getStatus(),
                 toUtc(document.getCreatedAt()),

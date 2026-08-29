@@ -1,6 +1,7 @@
 package io.bruno.docs_manager.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -8,8 +9,13 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -42,6 +48,12 @@ public class DocumentEntity {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "document_tags", joinColumns = @JoinColumn(name = "document_id"))
+    @Column(name = "tag", nullable = false, length = 64)
+    @BatchSize(size = 50) // Loads the tags of a whole page in one extra query instead of one per row.
+    private Set<String> tags = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("versionNumber ASC")
@@ -108,6 +120,28 @@ public class DocumentEntity {
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Set<String> getTags() {
+        return Collections.unmodifiableSet(tags);
+    }
+
+    /** Replaces the whole set; values are normalised so lookups can hit {@code idx_document_tags_tag} directly. */
+    public void setTags(Collection<String> tags) {
+        this.tags.clear();
+        if (tags == null) {
+            return;
+        }
+        for (String tag : tags) {
+            String normalised = normaliseTag(tag);
+            if (!normalised.isEmpty()) {
+                this.tags.add(normalised);
+            }
+        }
+    }
+
+    public static String normaliseTag(String tag) {
+        return tag == null ? "" : tag.strip().toLowerCase(Locale.ROOT);
     }
 
     public List<DocumentFileEntity> getFiles() {

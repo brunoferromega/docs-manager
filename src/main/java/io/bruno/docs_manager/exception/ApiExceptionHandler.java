@@ -32,6 +32,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(InvalidFilterException.class)
+    public ProblemDetail handleInvalidFilter(InvalidFilterException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Invalid filter");
+        return problem;
+    }
+
     /** Surfaces the per-field messages declared on the request records. */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(

@@ -2,6 +2,7 @@ package io.bruno.docs_manager.controller;
 
 import io.bruno.docs_manager.dto.ChangeStatusRequest;
 import io.bruno.docs_manager.dto.CreateDocumentRequest;
+import io.bruno.docs_manager.dto.DocumentFilter;
 import io.bruno.docs_manager.dto.DocumentResponse;
 import io.bruno.docs_manager.dto.UpdateDocumentRequest;
 import io.bruno.docs_manager.entity.DocumentStatus;
@@ -11,11 +12,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @RestController
@@ -46,8 +49,13 @@ public class DocumentController {
             @RequestParam(required = false) UUID ownerId,
             @RequestParam(required = false) DocumentStatus status,
             @RequestParam(required = false) String title,
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime createdFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime createdTo,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return new PagedModel<>(documentService.search(ownerId, status, title, pageable));
+
+        DocumentFilter filter = new DocumentFilter(ownerId, status, title, tag, createdFrom, createdTo);
+        return new PagedModel<>(documentService.search(filter, pageable));
     }
 
     @PutMapping("/{id}")

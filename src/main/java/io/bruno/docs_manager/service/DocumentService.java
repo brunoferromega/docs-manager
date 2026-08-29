@@ -1,11 +1,13 @@
 package io.bruno.docs_manager.service;
 
 import io.bruno.docs_manager.dto.CreateDocumentRequest;
+import io.bruno.docs_manager.dto.DocumentFilter;
 import io.bruno.docs_manager.dto.DocumentResponse;
 import io.bruno.docs_manager.dto.UpdateDocumentRequest;
 import io.bruno.docs_manager.entity.DocumentEntity;
 import io.bruno.docs_manager.entity.DocumentStatus;
 import io.bruno.docs_manager.exception.DocumentNotFoundException;
+import io.bruno.docs_manager.exception.InvalidFilterException;
 import io.bruno.docs_manager.exception.InvalidStatusTransitionException;
 import io.bruno.docs_manager.repository.DocumentRepository;
 import io.bruno.docs_manager.repository.DocumentSpecification;
@@ -38,6 +40,7 @@ public class DocumentService {
     public DocumentResponse create(CreateDocumentRequest request) {
         DocumentEntity document = new DocumentEntity(
                 request.title(), request.description(), request.ownerId(), DocumentStatus.DRAFT);
+        document.setTags(request.tags());
         // Flush so the response carries the generated id and timestamps.
         return DocumentResponse.from(documentRepository.saveAndFlush(document));
     }
@@ -47,10 +50,17 @@ public class DocumentService {
         return DocumentResponse.from(getOrThrow(id));
     }
 
+    /** An unmatched tag or period yields an empty page; only a self-contradictory period is rejected. */
     @Transactional(readOnly = true)
-    public Page<DocumentResponse> search(UUID ownerId, DocumentStatus status, String title, Pageable pageable) {
+    public Page<DocumentResponse> search(DocumentFilter filter, Pageable pageable) {
+        if (filter.createdFrom() != null
+                && filter.createdTo() != null
+                && filter.createdFrom().isAfter(filter.createdTo())) {
+            throw new InvalidFilterException("createdFrom must not be after createdTo");
+        }
+
         return documentRepository
-                .findAll(DocumentSpecification.filter(ownerId, status, title), pageable)
+                .findAll(DocumentSpecification.filter(filter), pageable)
                 .map(DocumentResponse::from);
     }
 
@@ -59,6 +69,7 @@ public class DocumentService {
         DocumentEntity document = getOrThrow(id);
         document.setTitle(request.title());
         document.setDescription(request.description());
+        document.setTags(request.tags());
         // Flush so the response carries the refreshed updated_at.
         return DocumentResponse.from(documentRepository.saveAndFlush(document));
     }
