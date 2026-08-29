@@ -10,6 +10,7 @@ import io.bruno.docs_manager.entity.DocumentEntity;
 import io.bruno.docs_manager.entity.DocumentFileEntity;
 import io.bruno.docs_manager.entity.DocumentStatus;
 import io.bruno.docs_manager.exception.DocumentNotFoundException;
+import io.bruno.docs_manager.exception.FileVersionNotFoundException;
 import io.bruno.docs_manager.exception.InvalidFilterException;
 import io.bruno.docs_manager.exception.InvalidStatusTransitionException;
 import io.bruno.docs_manager.repository.DocumentFileRepository;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -121,6 +123,28 @@ public class DocumentService {
         return DocumentFileResponse.from(file);
     }
 
+    /** Newest version first. Fails with 404 when the document itself does not exist. */
+    @Transactional(readOnly = true)
+    public List<DocumentFileResponse> listFiles(UUID documentId) {
+        requireDocument(documentId);
+        return documentFileRepository.findByDocumentIdOrderByVersionNumberDesc(documentId).stream()
+                .map(DocumentFileResponse::from)
+                .toList();
+    }
+
+    /**
+     * Returns one version's storage reference. The bytes live in the storage backend behind
+     * {@code fileKey}; this service hands out the reference and its checksum.
+     */
+    @Transactional(readOnly = true)
+    public DocumentFileResponse getFile(UUID documentId, int versionNumber) {
+        requireDocument(documentId);
+        return documentFileRepository
+                .findByDocumentIdAndVersionNumber(documentId, versionNumber)
+                .map(DocumentFileResponse::from)
+                .orElseThrow(() -> new FileVersionNotFoundException(documentId, versionNumber));
+    }
+
     /** Cascades to the document's files, both in the entity graph and via the FK's ON DELETE CASCADE. */
     @Transactional
     public void delete(UUID id) {
@@ -135,5 +159,11 @@ public class DocumentService {
 
     private DocumentEntity getOrThrow(UUID id) {
         return documentRepository.findById(id).orElseThrow(() -> new DocumentNotFoundException(id));
+    }
+
+    private void requireDocument(UUID id) {
+        if (!documentRepository.existsById(id)) {
+            throw new DocumentNotFoundException(id);
+        }
     }
 }

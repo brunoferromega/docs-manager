@@ -21,6 +21,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -68,6 +69,18 @@ public class DocumentController {
     @PatchMapping("/{id}/status")
     public DocumentResponse changeStatus(@PathVariable UUID id, @Valid @RequestBody ChangeStatusRequest request) {
         return documentService.changeStatus(id, request.status());
+    }
+
+    /** All versions of a document, newest first. */
+    @GetMapping("/{id}/files")
+    public List<DocumentFileResponse> listFiles(@PathVariable UUID id) {
+        return documentService.listFiles(id);
+    }
+
+    /** One specific version, carrying the storage reference to download from. */
+    @GetMapping("/{id}/files/{versionNumber}")
+    public DocumentFileResponse getFile(@PathVariable UUID id, @PathVariable int versionNumber) {
+        return documentService.getFile(id, versionNumber);
     }
 
     /** Registers a new file version; the version number is assigned server-side. */

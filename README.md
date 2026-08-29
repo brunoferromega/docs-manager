@@ -164,6 +164,8 @@ Base path: `/api/documents`
 | `GET`    | `/`                   | List with filters and pagination           |
 | `PUT`    | `/{id}`               | Update title, description and tags         |
 | `PATCH`  | `/{id}/status`        | Move through the status lifecycle          |
+| `GET`    | `/{id}/files`         | List every file version, newest first      |
+| `GET`    | `/{id}/files/{n}`     | Fetch one specific version                 |
 | `POST`   | `/{id}/files`         | Register the next file version             |
 | `DELETE` | `/{id}`               | Delete a document and its files/tags       |
 
@@ -199,6 +201,16 @@ curl -X POST http://localhost:8080/api/documents/<id>/files \
 `checksum` must be exactly 64 hexadecimal characters (SHA-256) and is stored lower-cased.
 `uploadedBy` is optional and defaults to the document owner. The document representation carries the
 most recent version as `latestFile`.
+
+List the version history, then fetch the one to download:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/documents/<id>/files
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/documents/<id>/files/2
+```
+
+Fetching a version returns its `fileKey` and `checksum`; the bytes are downloaded from the storage
+backend using that key. An unknown document or version returns `404`.
 
 ### Listing filters
 
