@@ -1,5 +1,6 @@
 package io.bruno.docs_manager.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -7,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.util.Set;
 import java.util.UUID;
 
+/** @param file optional first file version; when present it is stored as version 1 */
 public record CreateDocumentRequest(
         @NotBlank(message = "title is required")
         @Size(max = 255, message = "title must not exceed 255 characters")
@@ -14,4 +16,5 @@ public record CreateDocumentRequest(
         String description,
         @Size(max = 20, message = "a document cannot have more than 20 tags")
         Set<@Size(max = 64, message = "a tag must not exceed 64 characters") String> tags,
-        @NotNull(message = "owner is required") UUID ownerId) {}
+        @NotNull(message = "owner is required") UUID ownerId,
+        @Valid DocumentFileRequest file) {}

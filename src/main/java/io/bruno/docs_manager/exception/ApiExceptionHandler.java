@@ -1,5 +1,6 @@
 package io.bruno.docs_manager.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -29,6 +30,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleInvalidTransition(InvalidStatusTransitionException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
         problem.setTitle("Invalid status transition");
+        return problem;
+    }
+
+    /** Two uploads racing for the same version number lose on {@code uq_document_version}. */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleConstraintViolation(DataIntegrityViolationException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "The change conflicts with the current state of the resource");
+        problem.setTitle("Conflict");
         return problem;
     }
 

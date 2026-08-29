@@ -16,7 +16,8 @@ public record DocumentResponse(
         UUID ownerId,
         DocumentStatus status,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt) {
+        OffsetDateTime updatedAt,
+        DocumentFileResponse latestFile) {
 
     public static DocumentResponse from(DocumentEntity document) {
         return new DocumentResponse(
@@ -27,7 +28,8 @@ public record DocumentResponse(
                 document.getOwnerId(),
                 document.getStatus(),
                 toUtc(document.getCreatedAt()),
-                toUtc(document.getUpdatedAt()));
+                toUtc(document.getUpdatedAt()),
+                document.latestFile().map(DocumentFileResponse::from).orElse(null));
     }
 
     /**

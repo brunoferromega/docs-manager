@@ -2,6 +2,8 @@ package io.bruno.docs_manager.controller;
 
 import io.bruno.docs_manager.dto.ChangeStatusRequest;
 import io.bruno.docs_manager.dto.CreateDocumentRequest;
+import io.bruno.docs_manager.dto.DocumentFileRequest;
+import io.bruno.docs_manager.dto.DocumentFileResponse;
 import io.bruno.docs_manager.dto.DocumentFilter;
 import io.bruno.docs_manager.dto.DocumentResponse;
 import io.bruno.docs_manager.dto.UpdateDocumentRequest;
@@ -66,6 +68,16 @@ public class DocumentController {
     @PatchMapping("/{id}/status")
     public DocumentResponse changeStatus(@PathVariable UUID id, @Valid @RequestBody ChangeStatusRequest request) {
         return documentService.changeStatus(id, request.status());
+    }
+
+    /** Registers a new file version; the version number is assigned server-side. */
+    @PostMapping("/{id}/files")
+    public ResponseEntity<DocumentFileResponse> uploadFile(
+            @PathVariable UUID id, @Valid @RequestBody DocumentFileRequest request, UriComponentsBuilder uriBuilder) {
+
+        DocumentFileResponse file = documentService.addFile(id, request);
+        URI location = uriBuilder.path("api/documents/{id}/files/{version}").build(id, file.versionNumber());
+        return ResponseEntity.created(location).body(file);
     }
 
     @DeleteMapping("/{id}")

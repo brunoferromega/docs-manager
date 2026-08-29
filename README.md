@@ -120,7 +120,41 @@ Base path: `/api/documents`
 | `GET`    | `/`                   | List with filters and pagination           |
 | `PUT`    | `/{id}`               | Update title, description and tags         |
 | `PATCH`  | `/{id}/status`        | Move through the status lifecycle          |
+| `POST`   | `/{id}/files`         | Register the next file version             |
 | `DELETE` | `/{id}`               | Delete a document and its files/tags       |
+
+### File versions
+
+A document owns an ordered list of file versions. A file is a *reference* to an object in a storage
+backend (`fileKey`) plus its `checksum`; the bytes themselves are not stored by this service.
+
+`versionNumber` is always assigned by the server — the first file is version 1 and each upload takes
+the next number. Clients never supply it, and concurrent uploads for the same document race on the
+`uq_document_version` constraint, so the loser gets `409` instead of a duplicate version.
+
+Create a document with its first version in one call:
+
+```bash
+curl -X POST http://localhost:8080/api/documents \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "title": "Spec",
+        "ownerId": "<uuid>",
+        "file": { "fileKey": "s3://bucket/spec-v1.pdf", "checksum": "<64 hex chars>" }
+      }'
+```
+
+Add another version:
+
+```bash
+curl -X POST http://localhost:8080/api/documents/<id>/files \
+  -H 'Content-Type: application/json' \
+  -d '{ "fileKey": "s3://bucket/spec-v2.pdf", "checksum": "<64 hex chars>" }'
+```
+
+`checksum` must be exactly 64 hexadecimal characters (SHA-256) and is stored lower-cased.
+`uploadedBy` is optional and defaults to the document owner. The document representation carries the
+most recent version as `latestFile`.
 
 ### Listing filters
 

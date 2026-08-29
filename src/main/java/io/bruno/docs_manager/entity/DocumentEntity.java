@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,6 +58,7 @@ public class DocumentEntity {
 
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("versionNumber ASC")
+    @BatchSize(size = 50)
     private List<DocumentFileEntity> files = new ArrayList<>();
 
     protected DocumentEntity() {}
@@ -146,6 +148,11 @@ public class DocumentEntity {
 
     public List<DocumentFileEntity> getFiles() {
         return files;
+    }
+
+    /** Files are ordered by version, so the most recent one is last. */
+    public Optional<DocumentFileEntity> latestFile() {
+        return files.isEmpty() ? Optional.empty() : Optional.of(files.get(files.size() - 1));
     }
 
     @Override
