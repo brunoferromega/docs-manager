@@ -6,6 +6,7 @@ import io.bruno.docs_manager.dto.DocumentFileResponse;
 import io.bruno.docs_manager.dto.DocumentFilter;
 import io.bruno.docs_manager.dto.DocumentResponse;
 import io.bruno.docs_manager.dto.UpdateDocumentRequest;
+import io.bruno.docs_manager.entity.AuditAction;
 import io.bruno.docs_manager.entity.DocumentEntity;
 import io.bruno.docs_manager.entity.DocumentFileEntity;
 import io.bruno.docs_manager.entity.DocumentStatus;
@@ -40,10 +41,15 @@ public class DocumentService {
 
     private final DocumentRepository documentRepository;
     private final DocumentFileRepository documentFileRepository;
+    private final AuditService auditService;
 
-    public DocumentService(DocumentRepository documentRepository, DocumentFileRepository documentFileRepository) {
+    public DocumentService(
+            DocumentRepository documentRepository,
+            DocumentFileRepository documentFileRepository,
+            AuditService auditService) {
         this.documentRepository = documentRepository;
         this.documentFileRepository = documentFileRepository;
+        this.auditService = auditService;
     }
 
     /** Documents always start as {@link DocumentStatus#DRAFT}; use {@link #changeStatus} to move them on. */
@@ -58,7 +64,10 @@ public class DocumentService {
         }
 
         // Flush so the response carries the generated id and timestamps.
-        return DocumentResponse.from(documentRepository.saveAndFlush(document));
+        DocumentEntity saved = documentRepository.saveAndFlush(document);
+        auditService.record(AuditAction.DOCUMENT_CREATED, saved.getId(), Map.of());
+
+        return DocumentResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +96,10 @@ public class DocumentService {
         document.setDescription(request.description());
         document.setTags(request.tags());
         // Flush so the response carries the refreshed updated_at.
-        return DocumentResponse.from(documentRepository.saveAndFlush(document));
+        DocumentEntity saved = documentRepository.saveAndFlush(document);
+        auditService.record(AuditAction.DOCUMENT_UPDATED, id, Map.of());
+
+        return DocumentResponse.from(saved);
     }
 
     @Transactional
@@ -103,7 +115,10 @@ public class DocumentService {
         }
 
         document.setStatus(target);
-        return DocumentResponse.from(documentRepository.saveAndFlush(document));
+        DocumentEntity saved = documentRepository.saveAndFlush(document);
+        auditService.record(statusAction(target), id, Map.of());
+
+        return DocumentResponse.from(saved);
     }
 
     /**
@@ -119,6 +134,7 @@ public class DocumentService {
         DocumentFileEntity file = newFile(request, nextVersion, document.getOwnerId());
         document.addFile(file);
         documentRepository.saveAndFlush(document);
+        auditService.record(AuditAction.FILE_UPLOADED, documentId, Map.of());
 
         return DocumentFileResponse.from(file);
     }
@@ -136,19 +152,30 @@ public class DocumentService {
      * Returns one version's storage reference. The bytes live in the storage backend behind
      * {@code fileKey}; this service hands out the reference and its checksum.
      */
-    @Transactional(readOnly = true)
+    @Transactional // not read-only: fetching a version is what records the download
     public DocumentFileResponse getFile(UUID documentId, int versionNumber) {
         requireDocument(documentId);
-        return documentFileRepository
+        DocumentFileResponse file = documentFileRepository
                 .findByDocumentIdAndVersionNumber(documentId, versionNumber)
                 .map(DocumentFileResponse::from)
                 .orElseThrow(() -> new FileVersionNotFoundException(documentId, versionNumber));
+
+        auditService.record(AuditAction.FILE_DOWNLOADED, documentId, Map.of());
+        return file;
     }
 
     /** Cascades to the document's files, both in the entity graph and via the FK's ON DELETE CASCADE. */
     @Transactional
     public void delete(UUID id) {
         documentRepository.delete(getOrThrow(id));
+    }
+
+    private static AuditAction statusAction(DocumentStatus target) {
+        return switch (target) {
+            case PUBLISHED -> AuditAction.DOCUMENT_PUBLISHED;
+            case ARCHIVED -> AuditAction.DOCUMENT_ARCHIVED;
+            case DRAFT -> AuditAction.DOCUMENT_UPDATED; // unreachable: nothing transitions back to draft
+        };
     }
 
     private static DocumentFileEntity newFile(DocumentFileRequest request, int version, UUID documentOwner) {

@@ -242,6 +242,31 @@ curl -X PATCH http://localhost:8080/api/documents/<id>/status \
   -H 'Content-Type: application/json' -d '{"status":"PUBLISHED"}'
 ```
 
+## Audit trail
+
+Every change is recorded in the `audit_events` table:
+
+| Action               | Recorded when                          |
+|----------------------|----------------------------------------|
+| `DOCUMENT_CREATED`   | a document is created                  |
+| `DOCUMENT_UPDATED`   | title, description or tags change      |
+| `DOCUMENT_PUBLISHED` | status moves to `PUBLISHED`            |
+| `DOCUMENT_ARCHIVED`  | status moves to `ARCHIVED`             |
+| `FILE_UPLOADED`      | a file version is registered           |
+| `FILE_DOWNLOADED`    | a specific file version is fetched     |
+
+Each row holds the timestamp, the acting user (id and username taken from the bearer token), the
+action, the document id and a JSON metadata column.
+
+Records are written inside the same transaction as the change they describe, so an event can never
+appear for an operation that was rolled back. The table has no foreign key to `documents` on
+purpose: the trail outlives the rows it describes.
+
+```bash
+docker compose exec postgres psql -U bruno -d docs_storage \
+  -c 'select occurred_at, action, username, document_id, metadata from audit_events order by occurred_at desc limit 20;'
+```
+
 ### Errors
 
 Failures use RFC 9457 `application/problem+json`. Validation errors list the offending fields:
