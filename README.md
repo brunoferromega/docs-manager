@@ -88,8 +88,16 @@ Migrations are named `V<n>__<description>.sql`:
 ./gradlew test --tests '*DocumentServiceTest'
 ```
 
-Integration tests start their own PostgreSQL through Testcontainers, so Docker must be running.
-They do not use the `docker compose` database and will not touch its data.
+The service layer is covered by fast Mockito tests that need no database:
+
+| Test class           | Covers                                                                    |
+|----------------------|---------------------------------------------------------------------------|
+| `DocumentServiceTest` | Draft default, tag normalisation, version numbering, status transitions, filter validation, and the audit record written for each |
+| `AuthServiceTest`     | Unknown user, wrong password and disabled account all failing identically  |
+
+`DocsManagerApplicationTests` boots the full context against a PostgreSQL container started by
+Testcontainers, so Docker must be running. It does not use the `docker compose` database and will
+not touch its data.
 
 ## Run the application
 

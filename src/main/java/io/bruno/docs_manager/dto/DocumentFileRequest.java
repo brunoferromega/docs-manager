@@ -1,7 +1,7 @@
 package io.bruno.docs_manager.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -11,14 +11,14 @@ import java.util.UUID;
  * supplied by the client.
  *
  * @param fileKey    reference to the object in the storage backend
- * @param checksum   SHA-256 of the stored object, as 64 hex characters
+ * @param checksum   checksum algorithm used for the stored object, e.g. {@code SHA-256}, {@code MD5}
  * @param uploadedBy who uploaded it; defaults to the document owner when omitted
  */
 public record DocumentFileRequest(
         @NotBlank(message = "file key is required")
         @Size(max = 512, message = "file key must not exceed 512 characters")
         String fileKey,
-        @NotBlank(message = "checksum is required")
-        @Pattern(regexp = "^[A-Fa-f0-9]{64}$", message = "checksum must be 64 hexadecimal characters")
+        @NotNull(message = "checksum is required")
+        @Size(max = 20, message = "checksum must not exceed 20 characters")
         String checksum,
         UUID uploadedBy) {}
