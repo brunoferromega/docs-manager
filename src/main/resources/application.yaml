@@ -3,7 +3,7 @@ spring:
     name: docs-manager
   jpa:
     hibernate:
-      ddl-auto: create-drop #none          # Liquibase owns the schema
+      ddl-auto: validate          # Flyway owns the schema
     show-sql: true
 
   flyway:
