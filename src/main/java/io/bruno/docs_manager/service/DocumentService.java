@@ -22,12 +22,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentService {
@@ -65,7 +70,14 @@ public class DocumentService {
 
         // Flush so the response carries the generated id and timestamps.
         DocumentEntity saved = documentRepository.saveAndFlush(document);
-        auditService.record(AuditAction.DOCUMENT_CREATED, saved.getId(), Map.of());
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("title", saved.getTitle());
+        metadata.put("ownerId", saved.getOwnerId());
+        metadata.put("status", saved.getStatus());
+        metadata.put("tags", Set.copyOf(saved.getTags()));
+        saved.latestFile().ifPresent(file -> metadata.put("initialVersion", file.getVersionNumber()));
+        auditService.record(AuditAction.DOCUMENT_CREATED, saved.getId(), metadata);
 
         return DocumentResponse.from(saved);
     }
@@ -92,12 +104,21 @@ public class DocumentService {
     @Transactional
     public DocumentResponse update(UUID id, UpdateDocumentRequest request) {
         DocumentEntity document = getOrThrow(id);
+
+        // Snapshot before mutating so the trail can show what actually changed.
+        Map<String, Object> before = new LinkedHashMap<>();
+        Map<String, Object> after = new LinkedHashMap<>();
+        recordChange(before, after, "title", document.getTitle(), request.title());
+        recordChange(before, after, "description", document.getDescription(), request.description());
+        // Copy: getTags() is a live view that setTags would rewrite under us.
+        recordChange(before, after, "tags", Set.copyOf(document.getTags()), normalisedTags(request.tags()));
+
         document.setTitle(request.title());
         document.setDescription(request.description());
         document.setTags(request.tags());
         // Flush so the response carries the refreshed updated_at.
         DocumentEntity saved = documentRepository.saveAndFlush(document);
-        auditService.record(AuditAction.DOCUMENT_UPDATED, id, Map.of());
+        auditService.record(AuditAction.DOCUMENT_UPDATED, id, Map.of("before", before, "after", after));
 
         return DocumentResponse.from(saved);
     }
@@ -116,7 +137,7 @@ public class DocumentService {
 
         document.setStatus(target);
         DocumentEntity saved = documentRepository.saveAndFlush(document);
-        auditService.record(statusAction(target), id, Map.of());
+        auditService.record(statusAction(target), id, Map.of("from", current, "to", target));
 
         return DocumentResponse.from(saved);
     }
@@ -134,7 +155,14 @@ public class DocumentService {
         DocumentFileEntity file = newFile(request, nextVersion, document.getOwnerId());
         document.addFile(file);
         documentRepository.saveAndFlush(document);
-        auditService.record(AuditAction.FILE_UPLOADED, documentId, Map.of());
+        auditService.record(
+                AuditAction.FILE_UPLOADED,
+                documentId,
+                Map.of(
+                        "versionNumber", file.getVersionNumber(),
+                        "fileKey", file.getFileKey(),
+                        "checksum", file.getChecksum(),
+                        "uploadedBy", file.getUploadedBy()));
 
         return DocumentFileResponse.from(file);
     }
@@ -160,7 +188,10 @@ public class DocumentService {
                 .map(DocumentFileResponse::from)
                 .orElseThrow(() -> new FileVersionNotFoundException(documentId, versionNumber));
 
-        auditService.record(AuditAction.FILE_DOWNLOADED, documentId, Map.of());
+        auditService.record(
+                AuditAction.FILE_DOWNLOADED,
+                documentId,
+                Map.of("versionNumber", file.versionNumber(), "fileKey", file.fileKey()));
         return file;
     }
 
@@ -168,6 +199,27 @@ public class DocumentService {
     @Transactional
     public void delete(UUID id) {
         documentRepository.delete(getOrThrow(id));
+    }
+
+    /** Adds an entry to the before/after pair only when the value actually changed. */
+    private static void recordChange(
+            Map<String, Object> before, Map<String, Object> after, String field, Object oldValue, Object newValue) {
+
+        if (!Objects.equals(oldValue, newValue)) {
+            before.put(field, oldValue);
+            after.put(field, newValue);
+        }
+    }
+
+    /** Mirrors {@link DocumentEntity#setTags} so the comparison sees the stored form. */
+    private static Set<String> normalisedTags(Collection<String> tags) {
+        if (tags == null) {
+            return Set.of();
+        }
+        return tags.stream()
+                .map(DocumentEntity::normaliseTag)
+                .filter(tag -> !tag.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static AuditAction statusAction(DocumentStatus target) {

@@ -255,8 +255,32 @@ Every change is recorded in the `audit_events` table:
 | `FILE_UPLOADED`      | a file version is registered           |
 | `FILE_DOWNLOADED`    | a specific file version is fetched     |
 
-Each row holds the timestamp, the acting user (id and username taken from the bearer token), the
-action, the document id and a JSON metadata column.
+Each row holds the timestamp (`occurred_at`), the acting user (`user_id` and `username`, taken from
+the bearer token), the `action`, the `document_id` and a `jsonb` `metadata` column describing the
+event:
+
+| Action                                 | Metadata                                              |
+|----------------------------------------|-------------------------------------------------------|
+| `DOCUMENT_CREATED`                     | `title`, `ownerId`, `status`, `tags`, `initialVersion` |
+| `DOCUMENT_UPDATED`                     | `before`/`after` for the fields that actually changed  |
+| `DOCUMENT_PUBLISHED`/`DOCUMENT_ARCHIVED` | `from`, `to`                                        |
+| `FILE_UPLOADED`                        | `versionNumber`, `fileKey`, `checksum`, `uploadedBy`   |
+| `FILE_DOWNLOADED`                      | `versionNumber`, `fileKey`                             |
+
+```json
+{
+  "before": { "title": "Meta",         "tags": ["alpha", "beta"] },
+  "after":  { "title": "Meta renamed", "tags": ["alpha", "gamma"] }
+}
+```
+
+Being `jsonb`, metadata is queryable — for example every rename:
+
+```sql
+select occurred_at, username, metadata #>> '{before,title}' as was, metadata #>> '{after,title}' as now
+from audit_events
+where action = 'DOCUMENT_UPDATED' and metadata -> 'after' ? 'title';
+```
 
 Records are written inside the same transaction as the change they describe, so an event can never
 appear for an operation that was rolled back. The table has no foreign key to `documents` on
