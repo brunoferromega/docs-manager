@@ -1,6 +1,7 @@
 package io.bruno.docs_manager.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import io.bruno.docs_manager.entity.UserRole;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,7 +16,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +31,11 @@ public class SecurityConfig {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final int MIN_SECRET_BYTES = 32;
 
+    // Role names without the ROLE_ prefix, which hasRole/hasAnyRole add.
+    private static final String ADMIN = UserRole.ADMIN.name();
+    private static final String USER = UserRole.USER.name();
+    private static final String VIEWER = UserRole.VIEWER.name();
+
     private final JwtProperties jwtProperties;
 
     public SecurityConfig(JwtProperties jwtProperties) {
@@ -34,15 +43,31 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+        AuthenticationEntryPoint entryPoint = ProblemDetailAuthenticationHandlers.entryPoint(objectMapper);
+        AccessDeniedHandler accessDeniedHandler = ProblemDetailAuthenticationHandlers.accessDeniedHandler(objectMapper);
+
         return http
                 // No browser sessions or forms: every request carries its own bearer token.
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        // VIEWER is read-only, USER may create and edit, only ADMIN may delete.
+                        .requestMatchers(HttpMethod.GET, "/api/documents/**")
+                                .hasAnyRole(ADMIN, USER, VIEWER)
+                        .requestMatchers(HttpMethod.POST, "/api/documents/**").hasAnyRole(ADMIN, USER)
+                        .requestMatchers(HttpMethod.PUT, "/api/documents/**").hasAnyRole(ADMIN, USER)
+                        .requestMatchers(HttpMethod.PATCH, "/api/documents/**").hasAnyRole(ADMIN, USER)
+                        .requestMatchers(HttpMethod.DELETE, "/api/documents/**").hasRole(ADMIN)
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(authoritiesConverter())))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(authoritiesConverter()))
+                        .authenticationEntryPoint(entryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(entryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .build();
     }
 

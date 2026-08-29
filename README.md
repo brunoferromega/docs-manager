@@ -136,6 +136,17 @@ Then send it on every call:
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/documents
 ```
 
+### Roles
+
+| Action                                  | `ADMIN` | `USER` | `VIEWER` |
+|-----------------------------------------|:-------:|:------:|:--------:|
+| Read documents and file versions (`GET`) |    ✓    |   ✓    |    ✓     |
+| Create / update / change status / upload |    ✓    |   ✓    |          |
+| Delete documents (`DELETE`)              |    ✓    |        |          |
+
+A request without a token gets `401`; one whose role is not allowed gets `403`. Both come back as
+`application/problem+json`, the same shape as every other error.
+
 Tokens are HS256 JWTs valid for one hour, carrying the username as `sub`, the user id as `uid` and
 the role in a `roles` claim. The signing key comes from `app.security.jwt.secret`, overridable with
 the `JWT_SECRET` environment variable — the committed value is a development default and must be
