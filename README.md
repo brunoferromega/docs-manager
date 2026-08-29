@@ -109,6 +109,39 @@ Or run the API on the host, with only the database in Docker:
 automatically, so the database does not need to be started by hand. Either way the API listens on
 `http://localhost:8080`.
 
+## Authentication
+
+Every endpoint except `POST /api/auth/login` requires a bearer token.
+
+The `users` table is seeded by migration `V3` with three static accounts (passwords are BCrypt
+hashed in the database):
+
+| Username | Password    | Role     |
+|----------|-------------|----------|
+| `admin`  | `admin123`  | `ADMIN`  |
+| `user`   | `user123`   | `USER`   |
+| `viewer` | `viewer123` | `VIEWER` |
+
+Exchange credentials for a token:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}' | jq -r .accessToken)
+```
+
+Then send it on every call:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/documents
+```
+
+Tokens are HS256 JWTs valid for one hour, carrying the username as `sub`, the user id as `uid` and
+the role in a `roles` claim. The signing key comes from `app.security.jwt.secret`, overridable with
+the `JWT_SECRET` environment variable — the committed value is a development default and must be
+replaced in any real deployment. Bad credentials, unknown users and disabled accounts all return the
+same `401`, so the endpoint cannot be used to enumerate usernames.
+
 ## API
 
 Base path: `/api/documents`

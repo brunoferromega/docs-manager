@@ -27,6 +27,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/docs_storage
       SPRING_DATASOURCE_USERNAME: bruno
       SPRING_DATASOURCE_PASSWORD: bruno
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
     ports:
       - "8080:8080"
 
