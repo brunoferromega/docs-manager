@@ -1,6 +1,17 @@
 spring:
   application:
     name: docs-manager
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/docs_storage}
+    username: ${SPRING_DATASOURCE_USERNAME:bruno}
+    password: ${SPRING_DATASOURCE_PASSWORD:bruno}
+
+  # Local runs (bootRun / IDE) start the database only; the full stack lives in docker-compose.yaml.
+  docker:
+    compose:
+      file: docker-compose.dev.yaml
+
   jpa:
     hibernate:
       ddl-auto: validate          # Flyway owns the schema
@@ -10,6 +21,6 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-  logging:
-    level:
-      org.flywaydb: INFO
+logging:
+  level:
+    org.flywaydb: INFO

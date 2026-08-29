@@ -1,0 +1,7 @@
+.git
+.gradle
+.idea
+.claude
+build
+*.md
+!README.md

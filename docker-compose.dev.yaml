@@ -1,3 +1,5 @@
+# Database only. Spring Boot's Docker Compose support starts this file when the application runs
+# locally (bootRun / IDE), so the API itself stays on the host instead of being containerised twice.
 services:
   postgres:
     image: postgres:17
@@ -16,19 +18,6 @@ services:
       retries: 10
     labels:
       org.springframework.boot.service-connection: postgres
-
-  app:
-    build:
-      context: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/docs_storage
-      SPRING_DATASOURCE_USERNAME: bruno
-      SPRING_DATASOURCE_PASSWORD: bruno
-    ports:
-      - "8080:8080"
 
 volumes:
   pgdata:

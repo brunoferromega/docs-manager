@@ -12,7 +12,24 @@ backed by PostgreSQL with Flyway-managed migrations.
 
 The Gradle wrapper is committed, so no local Gradle install is needed.
 
+## Quick start
+
+```bash
+docker compose up --build
+```
+
+That is all that is needed: it builds the API image, starts `postgres:17`, waits until it is
+healthy, applies the Flyway migrations and serves the API on `http://localhost:8080`.
+
+```bash
+curl http://localhost:8080/api/documents
+```
+
+Stop with `Ctrl+C`, or `docker compose down` (add `-v` to also drop the database volume).
+
 ## Set up the environment
+
+Only needed to build or run the application outside Docker.
 
 Point `JAVA_HOME` at a JDK 25 install:
 
@@ -21,15 +38,20 @@ export JAVA_HOME=/path/to/jdk-25
 java -version   # should print 25.x
 ```
 
-Start PostgreSQL:
+The database runs on `localhost:5432` with database `docs_storage` and user/password
+`bruno`/`bruno`, which are the application's defaults. They can be overridden with
+`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`.
+Data is kept in the `pgdata` volume, so it survives restarts; `docker compose down -v` wipes it.
 
-```bash
-docker compose up -d
-```
+### Compose files
 
-This brings up `postgres:17` on `localhost:5432` with database `docs_storage` and user/password
-`bruno`/`bruno`, matching the defaults the application connects with. Data is kept in the `pgdata`
-volume, so it survives restarts; `docker compose down -v` wipes it.
+| File                      | Contains          | Used by                                            |
+|---------------------------|-------------------|----------------------------------------------------|
+| `docker-compose.yaml`     | PostgreSQL + API  | `docker compose up` — the whole stack               |
+| `docker-compose.dev.yaml` | PostgreSQL only   | `bootRun`/IDE, started automatically by Spring Boot |
+
+The split keeps local development from starting a second copy of the API in a container while one
+is already running on the host.
 
 ## Build
 
@@ -71,13 +93,21 @@ They do not use the `docker compose` database and will not touch its data.
 
 ## Run the application
 
+Whole stack in containers:
+
+```bash
+docker compose up --build
+```
+
+Or run the API on the host, with only the database in Docker:
+
 ```bash
 ./gradlew bootRun
 ```
 
-The app listens on `http://localhost:8080`. In development it uses Spring Boot's Docker Compose
-support to start PostgreSQL automatically, so `docker compose up -d` is optional when using
-`bootRun`.
+`bootRun` uses Spring Boot's Docker Compose support to start `docker-compose.dev.yaml`
+automatically, so the database does not need to be started by hand. Either way the API listens on
+`http://localhost:8080`.
 
 ## API
 
